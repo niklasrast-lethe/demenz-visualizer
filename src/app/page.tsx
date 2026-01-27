@@ -337,18 +337,91 @@ function buildPersonRender(dementiaEnd: number, preventableEnd: number, segments
   return out;
 }
 
+// --------------------
+// Icon silhouettes (male/female) – restroom-style full-body glyphs
+// --------------------
+
+function MaleShape({ fill }: { fill: string }) {
+  // Scale male glyph to match female total height (same visual length, same proportions)
+  // Target female bbox: top≈1.2, bottom≈26.2 (height≈25)
+  // Male bbox pre-scale: top≈1.4, bottom≈23.8 (height≈22.4)
+  // => uniform scale s=25/22.4≈1.116; translate to align top.
+  return (
+    <g transform="matrix(1.116 0 0 1.116 -1.393 -0.363)" fill={fill}>
+      {/* head (with subtle ears for easier sex distinction) */}
+      <circle cx="12" cy="4.2" r="2.8" />
+      <circle cx="9.4" cy="4.6" r="0.55" />
+      <circle cx="14.6" cy="4.6" r="0.55" />
+
+      {/* torso */}
+      <rect x="9.0" y="7.2" width="6.0" height="8.6" rx="3.0" />
+
+      {/* rounded shoulder joints (smooth arm attachment) */}
+      <circle cx="9.2" cy="8.9" r="1.35" />
+      <circle cx="14.8" cy="8.9" r="1.35" />
+
+      {/* arms (slight angle, less robotic) */}
+      <rect x="6.1" y="8.6" width="2.4" height="9.6" rx="1.2" transform="rotate(10 7.3 13.4)" />
+      <rect x="15.5" y="8.6" width="2.4" height="9.6" rx="1.2" transform="rotate(-10 16.7 13.4)" />
+
+      {/* legs */}
+      <rect x="9.5" y="15.2" width="2.3" height="8.6" rx="1.15" />
+      <rect x="12.2" y="15.2" width="2.3" height="8.6" rx="1.15" />
+    </g>
+  );
+}
+
+// Female icon (restroom-style) – full-body silhouette (head + dress + arms + legs)
+function FemaleShape({ fill }: { fill: string }) {
+  // Restroom-style female with clearer joints.
+  // Requested changes:
+  // - arms should attach with a rounded shoulder joint
+  // - keep flared skirt + visible legs
+  return (
+    <g fill={fill}>
+      {/* head */}
+      <circle cx="12" cy="4.1" r="2.9" />
+
+      {/* upper torso */}
+      <rect x="9.3" y="7.2" width="5.4" height="5.2" rx="2.1" />
+
+      {/* rounded shoulder joints (smooth arm attachment) */}
+      <circle cx="9.4" cy="8.9" r="1.45" />
+      <circle cx="14.6" cy="8.9" r="1.45" />
+
+      {/* arms (slight angle, connected into shoulder circles) */}
+      <rect x="5.7" y="8.5" width="2.4" height="9.6" rx="1.2" transform="rotate(12 6.9 13.3)" />
+      <rect x="15.9" y="8.5" width="2.4" height="9.6" rx="1.2" transform="rotate(-12 17.1 13.3)" />
+
+      {/* skirt (flared hem; ends above legs for clear separation) */}
+      <path d="M9.2 11.6H14.8L16.6 17.3C16.8 18.0 16.3 18.6 15.6 18.6H8.4C7.7 18.6 7.2 18.0 7.4 17.3L9.2 11.6Z" />
+
+      {/* legs (≈40% longer; keep stance) */}
+      <rect x="9.0" y="18.6" width="2.3" height="7.6" rx="1.15" />
+      <rect x="12.7" y="18.6" width="2.3" height="7.6" rx="1.15" />
+    </g>
+  );
+}
+
+function PersonShape({ sex, fill }: { sex: Sex; fill: string }) {
+  // IMPORTANT: exactly one silhouette at a time (prevents male/female overlay)
+  return sex === "w" ? <FemaleShape fill={fill} /> : <MaleShape fill={fill} />;
+}
+
 function PersonIcon({
   index,
   baselinePortion,
   preventablePortion,
   overlayParts,
+  sex,
 }: {
   index: number;
   baselinePortion: number;
   preventablePortion: number;
   overlayParts: { x: number; w: number; colorClass: string; label: string }[];
+  sex: Sex;
 }) {
-  const maskId = `person-mask-${index}`;
+  const maskId = `person-mask-${sex}-${index}`;
   const baselineW = Math.max(0, Math.min(24, baselinePortion * 24));
   const preventableW = Math.max(0, Math.min(24, preventablePortion * 24));
 
@@ -363,9 +436,9 @@ function PersonIcon({
   return (
     <div title={tooltip} className="flex items-center justify-center" aria-label={tooltip}>
       <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
+        width="54"
+        height="63"
+        viewBox="0 0 24 28"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="text-slate-300"
@@ -373,29 +446,40 @@ function PersonIcon({
       >
         <defs>
           <mask id={maskId} maskUnits="userSpaceOnUse">
-            <rect x="0" y="0" width="24" height="24" fill="black" />
-            <path
-              d="M12 12a4.2 4.2 0 1 0-4.2-4.2A4.2 4.2 0 0 0 12 12Zm0 2.2c-4.4 0-8 2.2-8 4.9V21h16v-1.9c0-2.7-3.6-4.9-8-4.9Z"
-              fill="white"
-            />
+            <rect x="0" y="0" width="24" height="28" fill="black" />
+            <PersonShape sex={sex} fill="white" />
           </mask>
         </defs>
 
         {/* Grundform (grau) */}
-        <path
-          d="M12 12a4.2 4.2 0 1 0-4.2-4.2A4.2 4.2 0 0 0 12 12Zm0 2.2c-4.4 0-8 2.2-8 4.9V21h16v-1.9c0-2.7-3.6-4.9-8-4.9Z"
-          className="fill-current"
-          opacity={0.9}
-        />
+        <g opacity={0.9}>
+          <PersonShape sex={sex} fill="currentColor" />
+        </g>
 
         {/* Demenz (rot) */}
         {active && baselineW > 0 && (
-          <rect x="0" y="0" width={baselineW} height="24" className={`fill-current ${DEMENTIA_COLOR_CLASS}`} mask={`url(#${maskId})`} opacity={0.85} />
+          <rect
+            x="0"
+            y="0"
+            width={baselineW}
+            height="28"
+            className={`fill-current ${DEMENTIA_COLOR_CLASS}`}
+            mask={`url(#${maskId})`}
+            opacity={0.85}
+          />
         )}
 
         {/* Modifizierbar gesamt (grün) */}
         {active && preventableW > 0 && (
-          <rect x="0" y="0" width={preventableW} height="24" className={`fill-current ${PREVENTABLE_COLOR_CLASS}`} mask={`url(#${maskId})`} opacity={0.85} />
+          <rect
+            x="0"
+            y="0"
+            width={preventableW}
+            height="28"
+            className={`fill-current ${PREVENTABLE_COLOR_CLASS}`}
+            mask={`url(#${maskId})`}
+            opacity={0.85}
+          />
         )}
 
         {/* Aktuelle Risikofaktoren (blau) */}
@@ -406,7 +490,7 @@ function PersonIcon({
               x={p.x}
               y="0"
               width={p.w}
-              height="24"
+              height="28"
               className={`fill-current ${p.colorClass}`}
               mask={`url(#${maskId})`}
               opacity={1}
@@ -478,7 +562,11 @@ export default function HundredPeopleVisualizer() {
   // Grün (nicht ausgewählt) = Rest
   const preventedGreen = Math.max(0, preventableCap - preventedBlue);
 
-  const sentenceStratum = `Wenn Sie ${SEX_LABEL_SENTENCE[sex]} ${ageLabel} Jahre alt werden, liegt Ihr Demenzrisiko bei ${fmtDE(prevalence)}%.`;
+  const sentenceStratum = (
+    <span>
+      Wenn Sie <span className="font-semibold">{SEX_LABEL_SENTENCE[sex]}</span> ein Alter von <span className="font-semibold">{ageLabel} Jahren</span> erreichen, beträgt Ihr Demenzrisiko <span className={`font-semibold ${DEMENTIA_COLOR_CLASS}`}>{fmtDE(prevalence)} %</span>. Durch gezielte Intervention lässt sich Ihr Risiko um bis zu <span className={`font-semibold ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventableCap)} %</span> senken.
+    </span>
+  );
 
   return (
     <div className="w-full p-4 md:p-8">
@@ -512,15 +600,9 @@ export default function HundredPeopleVisualizer() {
             <CardContent className="space-y-4 pt-6">
               {/* Sex + Age */}
               <div className="rounded-xl border p-3 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="space-y-0.5">
+                <div className="space-y-0.5">
                     <div className="text-sm font-medium">{stratumLabel}</div>
-                    <div className="text-xs text-muted-foreground">Prävalenz: {fmtDE(prevalence)} / 100</div>
                   </div>
-                  <Badge variant="secondary" className="tabular-nums">
-                    Modifizierbar: <span className={`${PREVENTABLE_COLOR_CLASS} font-medium`}>{fmtDE(preventableCap)}</span> / 100
-                  </Badge>
-                </div>
 
                 <div className="flex flex-wrap gap-2">
                   <Button variant={sex === "m" ? "default" : "outline"} onClick={() => setStratum("m", ageGroup)}>
@@ -545,13 +627,9 @@ export default function HundredPeopleVisualizer() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm font-medium">Risikofaktoren</div>
-                    <div className="text-xs text-muted-foreground">
-                      Max. verhindert: <span className={`font-medium ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventableCap)} / 100</span>
-                    </div>
+                    
                   </div>
-                  <Badge variant="secondary" className="tabular-nums">
-                    Selektiert: {fmtDE(selectedSum)} / {fmtDE(preventableCap)}
-                  </Badge>
+                  
                 </div>
 
                 <div className="mt-3 space-y-2">
@@ -588,16 +666,17 @@ export default function HundredPeopleVisualizer() {
           <Card className="rounded-2xl md:col-span-2">
             <CardContent className="space-y-4 pt-6">
               <div className="rounded-xl border p-3">
-                <div className="text-sm text-muted-foreground">{sentenceStratum}</div>
+                <div className="text-xs md:text-sm leading-snug">{sentenceStratum}</div>
               </div>
 
-              <div className="grid grid-cols-10 gap-1 rounded-xl border p-3">
+              <div className="grid grid-cols-10 gap-0.5 rounded-xl border p-2">
                 {persons.map((p, i) => (
                   <PersonIcon
-                    key={i}
+                    key={`p-${i}`}
                     index={i}
                     baselinePortion={p.baselinePortion}
                     preventablePortion={p.preventablePortion}
+                    sex={sex}
                     overlayParts={p.baselinePortion > 0 ? p.overlayParts : []}
                   />
                 ))}
@@ -626,7 +705,7 @@ export default function HundredPeopleVisualizer() {
                   Ihr Risiko lässt sich zu: <span className={`font-medium tabular-nums ${SELECTED_FACTOR_COLOR_CLASS}`}>{fmtDE(preventedBlue)}%</span> reduzieren!
                 </div>
                 <div className="mt-1">
-                  Sie haben Ihr Demenzrisiko um <span className={`font-medium tabular-nums ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventedGreen)}</span> von 100 reduziert (entspricht dem grünen Anteil).
+                  Sie haben Ihr Demenzrisiko um <span className={`font-medium tabular-nums ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventedGreen)}</span> von 100 reduziert.
                 </div>
               </div>
             </CardContent>
