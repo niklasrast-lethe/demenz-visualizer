@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -14,36 +14,34 @@ import { Users, RotateCcw } from "lucide-react";
 // --------------------
 
 type Sex = "m" | "w";
-// 75–79, 80–84, 85–89, 90+
 type AgeGroup = "75-79" | "80-84" | "85-89" | "90+";
 
 type RiskMeta = {
   id: string;
   label: string;
-  colorClass: string;
 };
 
 type RiskFactor = {
   id: RiskId;
   label: string;
   value: number; // absolute persons per 100 (within preventable share)
-  colorClass: string;
 };
 
 type Stratum = {
   prevalence: number; // dementia prevalence per 100
-  weights: Record<RiskId, number>; // your stratum-specific factor values (used as weights, then scaled to 45%)
+  weights: Record<RiskId, number>; // stratum-specific factor values (used as weights; scaled to 45% of prevalence)
 };
 
 type OverlaySegment = {
-  start: number; // in Personen-Einheiten, 0..overlayCap
+  start: number; // in Personen-Einheiten, 0..preventableCap
   end: number;
   colorClass: string;
   label: string;
 };
 
 type PersonRender = {
-  baselinePortion: number; // 0..1
+  baselinePortion: number; // 0..1 (Demenz)
+  preventablePortion: number; // 0..1 (Modifizierbar gesamt)
   overlayParts: { x: number; w: number; colorClass: string; label: string }[];
 };
 
@@ -53,27 +51,30 @@ type PersonRender = {
 
 const PREVENTABLE_SHARE = 0.45;
 
-// Farbcodes (Hex)
-const DEMENTIA_COLOR_CLASS = "text-[#F37458]"; // F37458
+// Farben (Hex)
+const DEMENTIA_COLOR_CLASS = "text-[#F37458]"; // Demenz
 const DEMENTIA_BG_CLASS = "bg-[#F37458]";
-const RISK_COLOR_CLASS = "text-[#09AD6F]"; // 09AD6F
 
-// Meta: IDs + Labels (IDs bleiben stabil für Switch-Selection)
+const PREVENTABLE_COLOR_CLASS = "text-[#09AD6F]"; // Modifizierbar gesamt
+const PREVENTABLE_BG_CLASS = "bg-[#09AD6F]";
+
+const SELECTED_FACTOR_COLOR_CLASS = "text-[#5B72C8]"; // aktuelle Risikofaktoren (unten + Overlay)
+
 const RISK_META = [
-  { id: "rf-edu", label: "Weniger Bildung", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-hearing", label: "Hörverlust", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-ldl", label: "Hohes Low density lipoprotein Cholesterin", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-depr", label: "Depression", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-tbi", label: "Traumatische Hirnverletzung", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-inactivity", label: "Körperliche Inaktivität", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-smoking", label: "Rauchen", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-diabetes", label: "Diabetes", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-htn", label: "Hypertonie", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-obesity", label: "Adipositas", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-alcohol", label: "Exzessiver Alkoholkonsum", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-isolation", label: "Soziale Isolation", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-air", label: "Luftverschmutzung", colorClass: RISK_COLOR_CLASS },
-  { id: "rf-vision", label: "Unbehandelter Sehverlust", colorClass: RISK_COLOR_CLASS },
+  { id: "rf-edu", label: "Kognitive Aktivität" },
+  { id: "rf-hearing", label: "Hörverlust" },
+  { id: "rf-ldl", label: "Hohes LDL-C" },
+  { id: "rf-depr", label: "Depression" },
+  { id: "rf-tbi", label: "Traumatische Hirnverletzung" },
+  { id: "rf-inactivity", label: "Körperliche Inaktivität" },
+  { id: "rf-smoking", label: "Rauchen" },
+  { id: "rf-diabetes", label: "Diabetes" },
+  { id: "rf-htn", label: "Hypertonie" },
+  { id: "rf-obesity", label: "Adipositas" },
+  { id: "rf-alcohol", label: "Exzessiver Alkoholkonsum" },
+  { id: "rf-isolation", label: "Soziale Isolation" },
+  { id: "rf-air", label: "Luftverschmutzung" },
+  { id: "rf-vision", label: "Unbehandelter Sehverlust" },
 ] as const satisfies readonly RiskMeta[];
 
 type RiskId = (typeof RISK_META)[number]["id"];
@@ -88,7 +89,7 @@ const AGE_GROUPS: { id: AgeGroup; label: string }[] = [
 const SEX_LABEL: Record<Sex, string> = { m: "Männer", w: "Frauen" };
 
 // --------------------
-// Data: prevalence + your factor values (used as weights; then scaled to exactly 45% of prevalence)
+// Data
 // --------------------
 
 const STRATA: Record<Sex, Record<AgeGroup, Stratum>> = {
@@ -270,45 +271,52 @@ function buildRiskFactorsForStratum(stratum: Stratum): { prevalence: number; pre
     return {
       id: m.id,
       label: m.label,
-      colorClass: m.colorClass,
-      value: (preventableCap * w) / total, // scaled so all factors sum EXACTLY to 45% of prevalence
+      value: (preventableCap * w) / total, // skaliert so, dass Summe exakt 45% der Prävalenz ergibt
     };
   });
 
   return { prevalence, preventableCap, factors };
 }
 
-function buildOverlaySegments(
-  overlayCap: number,
-  selected: RiskFactor[]
-): { segments: OverlaySegment[]; overflow: number } {
+function buildOverlaySegments(preventableCap: number, selected: RiskFactor[]): { segments: OverlaySegment[]; overflow: number } {
+  // Blau füllt von hinten: Start am Ende des grünen Anteils und dann nach links.
   const segs: OverlaySegment[] = [];
   let cursor = 0;
 
   for (const rf of selected) {
-    const start = cursor;
-    const end = Math.min(overlayCap, cursor + Math.max(0, rf.value));
-    if (end > start) segs.push({ start, end, colorClass: rf.colorClass, label: rf.label });
-    cursor += Math.max(0, rf.value);
+    const v = Math.max(0, rf.value);
+
+    const end = Math.min(preventableCap, Math.max(0, preventableCap - cursor));
+    const start = Math.min(preventableCap, Math.max(0, preventableCap - (cursor + v)));
+
+    if (end > start) segs.push({ start, end, colorClass: SELECTED_FACTOR_COLOR_CLASS, label: rf.label });
+
+    cursor += v;
   }
 
-  const overflow = Math.max(0, cursor - overlayCap);
+  const overflow = Math.max(0, cursor - preventableCap);
   return { segments: segs, overflow };
 }
 
-function buildPersonRender(baselineEnd: number, segments: OverlaySegment[]): PersonRender[] {
-  const out: PersonRender[] = Array.from({ length: 100 }, () => ({ baselinePortion: 0, overlayParts: [] }));
+function buildPersonRender(dementiaEnd: number, preventableEnd: number, segments: OverlaySegment[]): PersonRender[] {
+  const out: PersonRender[] = Array.from({ length: 100 }, () => ({ baselinePortion: 0, preventablePortion: 0, overlayParts: [] }));
 
-  // Baseline (Demenz)
   for (let i = 0; i < 100; i++) {
     const pStart = i;
     const pEnd = i + 1;
-    const bStart = Math.max(pStart, 0);
-    const bEnd = Math.min(pEnd, baselineEnd);
-    out[i].baselinePortion = Math.max(0, bEnd - bStart); // 0..1
+
+    // Demenz
+    const dStart = Math.max(pStart, 0);
+    const dEnd = Math.min(pEnd, dementiaEnd);
+    out[i].baselinePortion = Math.max(0, dEnd - dStart);
+
+    // Modifizierbar gesamt
+    const mStart = Math.max(pStart, 0);
+    const mEnd = Math.min(pEnd, preventableEnd);
+    out[i].preventablePortion = Math.max(0, mEnd - mStart);
   }
 
-  // Overlays (Risikofaktoren)
+  // Aktuelle Risikofaktoren (Overlay in Blau) innerhalb des modifizierbaren Anteils
   for (const seg of segments) {
     const first = Math.floor(seg.start);
     const last = Math.ceil(seg.end);
@@ -331,21 +339,24 @@ function buildPersonRender(baselineEnd: number, segments: OverlaySegment[]): Per
 function PersonIcon({
   index,
   baselinePortion,
+  preventablePortion,
   overlayParts,
   active,
 }: {
   index: number;
   baselinePortion: number;
+  preventablePortion: number;
   overlayParts: { x: number; w: number; colorClass: string; label: string }[];
   active: boolean;
 }) {
   const maskId = `person-mask-${index}`;
   const baselineW = Math.max(0, Math.min(24, baselinePortion * 24));
+  const preventableW = Math.max(0, Math.min(24, preventablePortion * 24));
 
   const tooltip = !active
     ? "Nicht markiert"
     : overlayParts.length
-      ? `Demenz (Teil) + ${[...new Set(overlayParts.map((p) => p.label))].join(", ")}`
+      ? `Demenz (Teil) – verhindert: ${[...new Set(overlayParts.map((p) => p.label))].join(", ")}`
       : "Demenz";
 
   return (
@@ -376,7 +387,7 @@ function PersonIcon({
           opacity={0.9}
         />
 
-        {/* Baseline (rot) */}
+        {/* Demenz (rot) */}
         {active && baselineW > 0 && (
           <rect
             x="0"
@@ -389,7 +400,20 @@ function PersonIcon({
           />
         )}
 
-        {/* Overlays (Risikofaktoren) */}
+        {/* Modifizierbar gesamt (grün) */}
+        {active && preventableW > 0 && (
+          <rect
+            x="0"
+            y="0"
+            width={preventableW}
+            height="24"
+            className={`fill-current ${PREVENTABLE_COLOR_CLASS}`}
+            mask={`url(#${maskId})`}
+            opacity={0.85}
+          />
+        )}
+
+        {/* Aktuelle Risikofaktoren (blau) */}
         {active &&
           overlayParts.map((p, idx) => (
             <rect
@@ -432,7 +456,6 @@ export default function HundredPeopleVisualizer() {
   const setStratum = (nextSex: Sex, nextAge: AgeGroup) => {
     setSex(nextSex);
     setAgeGroup(nextAge);
-    // Auswahl resetten, damit nichts „hängen bleibt“ bei Stratum-Wechsel
     setSelectedIds(new Set());
   };
 
@@ -454,17 +477,20 @@ export default function HundredPeopleVisualizer() {
   }, [RISK_FACTORS, selectedIds]);
 
   const baselineEnd = dementiaOn ? Math.min(100, Math.max(0, prevalence)) : 0;
-  const overlayCap = dementiaOn ? Math.min(baselineEnd, Math.max(0, preventableCap)) : 0;
+  const preventableEnd = dementiaOn ? Math.min(baselineEnd, Math.max(0, preventableCap)) : 0;
 
   const { overlaySegments, selectedSum, overflow } = useMemo(() => {
     const sum = selectedRiskFactors.reduce((acc, rf) => acc + Math.max(0, rf.value), 0);
-    const { segments, overflow } = buildOverlaySegments(overlayCap, selectedRiskFactors);
+    const { segments, overflow } = buildOverlaySegments(preventableEnd, selectedRiskFactors);
     return { overlaySegments: segments, selectedSum: sum, overflow };
-  }, [overlayCap, selectedRiskFactors]);
+  }, [preventableEnd, selectedRiskFactors]);
 
-  const persons = useMemo(() => buildPersonRender(baselineEnd, overlaySegments), [baselineEnd, overlaySegments]);
+  const persons = useMemo(() => buildPersonRender(baselineEnd, preventableEnd, overlaySegments), [baselineEnd, preventableEnd, overlaySegments]);
 
   const stratumLabel = `${SEX_LABEL[sex]} ${AGE_GROUPS.find((a) => a.id === ageGroup)?.label ?? ageGroup}`;
+
+  const preventedShown = dementiaOn ? Math.min(preventableCap, Math.max(0, selectedSum)) : 0;
+  const reducedRisk = Math.max(0, prevalence - preventedShown);
 
   return (
     <div className="w-full p-4 md:p-8">
@@ -473,11 +499,12 @@ export default function HundredPeopleVisualizer() {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              <h1 className="text-xl font-semibold tracking-tight">Darstellung von 100 Personen (Demenz + modifizierbare Risikofaktoren)</h1>
+              <h1 className="text-xl font-semibold tracking-tight">Modifizierbares Demenzrisiko</h1>
             </div>
             <p className="text-sm text-muted-foreground">
-              Auswahl nach Geschlecht und Altersgruppe. Rot: Prävalenz. Grün: modifizierbarer Anteil ({fmtDE(PREVENTABLE_SHARE * 100)}%).
+              Näherungswerte nach Livingston et al., The Lancet Commission on dementia prevention, intervention, and care (2024).
             </p>
+            <p className="text-xs text-muted-foreground">Rot: Demenzprävalenz. Grün: modifizierbarer Anteil (45%). Blau: aktuelle Risikofaktoren.</p>
           </div>
           <Button variant="outline" onClick={reset} className="shrink-0">
             <RotateCcw className="mr-2 h-4 w-4" />
@@ -485,12 +512,12 @@ export default function HundredPeopleVisualizer() {
           </Button>
         </div>
 
-        {dementiaOn && selectedSum > overlayCap && (
+        {dementiaOn && selectedSum > preventableEnd && (
           <Alert>
             <AlertTitle>Hinweis</AlertTitle>
             <AlertDescription>
-              Summe der ausgewählten Risikofaktoren: <span className="font-medium">{fmtDE(selectedSum)}</span>. Das überschreitet
-              <span className="font-medium"> {fmtDE(overlayCap)}</span> (modifizierbarer Anteil). Der Überschuss wird nicht dargestellt:
+              Summe der ausgewählten Faktoren: <span className="font-medium">{fmtDE(selectedSum)}</span>. Das überschreitet
+              <span className="font-medium"> {fmtDE(preventableEnd)}</span> (modifizierbarer Anteil). Überschuss wird nicht dargestellt:
               <span className="font-medium"> {fmtDE(overflow)}</span>.
             </AlertDescription>
           </Alert>
@@ -499,47 +526,31 @@ export default function HundredPeopleVisualizer() {
         <div className="grid gap-4 md:grid-cols-2">
           {/* LEFT */}
           <Card className="rounded-2xl">
-            <CardHeader>
-              <CardTitle className="text-base">Auswahl (Stratum + Faktoren)</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Stratum selector */}
+            <CardContent className="space-y-4 pt-6">
+              {/* Sex + Age */}
               <div className="rounded-xl border p-3 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="space-y-0.5">
-                    <div className="text-sm font-medium">Stratum</div>
-                    <div className="text-xs text-muted-foreground">{stratumLabel}</div>
+                    <div className="text-sm font-medium">{stratumLabel}</div>
+                    <div className="text-xs text-muted-foreground">Prävalenz: {fmtDE(prevalence)} / 100</div>
                   </div>
                   <Badge variant="secondary" className="tabular-nums">
-                    Prävalenz: {fmtDE(prevalence)} / 100
+                    Modifizierbar: {fmtDE(preventableCap)} / 100
                   </Badge>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant={sex === "m" ? "default" : "outline"}
-                    onClick={() => setStratum("m", ageGroup)}
-                    className={sex === "m" ? "hover:opacity-90" : ""}
-                  >
+                  <Button variant={sex === "m" ? "default" : "outline"} onClick={() => setStratum("m", ageGroup)}>
                     Männer
                   </Button>
-                  <Button
-                    variant={sex === "w" ? "default" : "outline"}
-                    onClick={() => setStratum("w", ageGroup)}
-                    className={sex === "w" ? "hover:opacity-90" : ""}
-                  >
+                  <Button variant={sex === "w" ? "default" : "outline"} onClick={() => setStratum("w", ageGroup)}>
                     Frauen
                   </Button>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                   {AGE_GROUPS.map((ag) => (
-                    <Button
-                      key={ag.id}
-                      variant={ageGroup === ag.id ? "default" : "outline"}
-                      onClick={() => setStratum(sex, ag.id)}
-                      className={ageGroup === ag.id ? "hover:opacity-90" : ""}
-                    >
+                    <Button key={ag.id} variant={ageGroup === ag.id ? "default" : "outline"} onClick={() => setStratum(sex, ag.id)}>
                       {ag.label}
                     </Button>
                   ))}
@@ -552,13 +563,14 @@ export default function HundredPeopleVisualizer() {
                   <div className="space-y-0.5">
                     <div className="text-sm font-medium">Demenz</div>
                     <div className="text-xs text-muted-foreground">{stratumLabel}</div>
-                    <div className="text-xs text-muted-foreground">Prävalenz: {fmtDE(prevalence)} von 100</div>
-                    <div className="text-xs text-muted-foreground">Modifizierbar ({fmtDE(PREVENTABLE_SHARE * 100)}%): {fmtDE(preventableCap)} von 100</div>
+                    <div className="text-xs text-muted-foreground">Demenz: {fmtDE(prevalence)} / 100</div>
+                    <div className="text-xs text-muted-foreground">
+                      Modifizierbar (45%): <span className={`font-medium ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventableCap)} / 100</span>
+                    </div>
                   </div>
                   <Button
                     onClick={() => {
                       setDementiaOn((v) => !v);
-                      // bei Umschalten (aus) auch Faktoren deaktivieren
                       if (dementiaOn) setSelectedIds(new Set());
                     }}
                     variant={dementiaOn ? "default" : "outline"}
@@ -569,12 +581,14 @@ export default function HundredPeopleVisualizer() {
                 </div>
               </div>
 
-              {/* Risk factor switches */}
+              {/* Risk factors */}
               <div className="rounded-xl border p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm font-medium">Risikofaktoren</div>
-                    <div className="text-xs text-muted-foreground">Summe (max.): {fmtDE(preventableCap)} von 100</div>
+                    <div className="text-xs text-muted-foreground">
+                      Max. verhindert: <span className={`font-medium ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventableCap)} / 100</span>
+                    </div>
                   </div>
                   <Badge variant="secondary" className="tabular-nums">
                     Selektiert: {dementiaOn ? fmtDE(selectedSum) : "0,0"} / {fmtDE(preventableCap)}
@@ -584,14 +598,17 @@ export default function HundredPeopleVisualizer() {
                 <div className="mt-3 space-y-2">
                   {RISK_FACTORS.map((rf) => {
                     const on = selectedIds.has(rf.id);
+                    const dotColor = on ? SELECTED_FACTOR_COLOR_CLASS : PREVENTABLE_COLOR_CLASS;
+                    const textColor = on ? "text-[#5B72C8]" : "";
+
                     return (
-                      <div key={rf.id} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+                      <div key={rf.id} className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 ${on ? "border-[#5B72C8]" : ""}`}>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className={`inline-flex h-3 w-3 rounded-full bg-current ${rf.colorClass}`} aria-hidden="true" />
-                            <span className="text-sm font-medium truncate">{rf.label}</span>
+                            <span className={`inline-flex h-3 w-3 rounded-full bg-current ${dotColor}`} aria-hidden="true" />
+                            <span className={`text-sm font-medium truncate ${textColor}`}>{rf.label}</span>
                           </div>
-                          <div className="mt-0.5 text-xs text-muted-foreground">{fmtDE(rf.value)} von 100</div>
+                          <div className="mt-0.5 text-xs text-muted-foreground">{fmtDE(rf.value)} / 100</div>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -607,9 +624,7 @@ export default function HundredPeopleVisualizer() {
                     );
                   })}
 
-                  {!dementiaOn && (
-                    <div className="text-xs text-muted-foreground">Erst „Demenz“ anklicken, dann sind Risikofaktoren auswählbar.</div>
-                  )}
+                  {!dementiaOn && <div className="text-xs text-muted-foreground">Erst „Demenz“ anklicken, dann sind Risikofaktoren auswählbar.</div>}
                 </div>
               </div>
             </CardContent>
@@ -617,17 +632,14 @@ export default function HundredPeopleVisualizer() {
 
           {/* RIGHT */}
           <Card className="rounded-2xl">
-            <CardHeader>
-              <CardTitle className="text-base">Visualisierung</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pt-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm">
                   Demenz: <span className="font-medium tabular-nums">{dementiaOn ? fmtDE(baselineEnd) : "0,0"}</span> / 100
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  Modifizierbar selektiert: <span className="font-medium tabular-nums">{dementiaOn ? fmtDE(selectedSum) : "0,0"}</span> /
-                  <span className="font-medium tabular-nums"> {fmtDE(preventableCap)}</span>
+                  Verhindert: <span className="font-medium tabular-nums">{dementiaOn ? fmtDE(preventedShown) : "0,0"}</span> /
+                  <span className={`font-medium tabular-nums ${PREVENTABLE_COLOR_CLASS}`}> {fmtDE(preventableCap)}</span>
                 </div>
               </div>
 
@@ -639,6 +651,7 @@ export default function HundredPeopleVisualizer() {
                       key={i}
                       index={i}
                       baselinePortion={p.baselinePortion}
+                      preventablePortion={p.preventablePortion}
                       overlayParts={active ? p.overlayParts : []}
                       active={active}
                     />
@@ -651,30 +664,27 @@ export default function HundredPeopleVisualizer() {
                 <div className="flex flex-wrap gap-2">
                   <div className="flex items-center gap-2 rounded-full border px-3 py-1">
                     <span className={`inline-flex h-3 w-3 rounded-full ${DEMENTIA_BG_CLASS}`} aria-hidden="true" />
-                    <span className="text-sm">Demenz: {fmtDE(prevalence)}</span>
+                    <span className="text-sm">Demenz</span>
                   </div>
-
-                  {selectedRiskFactors.map((rf) => (
-                    <div key={rf.id} className="flex items-center gap-2 rounded-full border px-3 py-1">
-                      <span className={`inline-flex h-3 w-3 rounded-full bg-current ${rf.colorClass}`} aria-hidden="true" />
-                      <span className="text-sm">
-                        {rf.label}: {fmtDE(rf.value)}
-                      </span>
-                    </div>
-                  ))}
-
-                  {selectedRiskFactors.length === 0 && (
-                    <div className="text-sm text-muted-foreground">Keine Risikofaktoren ausgewählt.</div>
-                  )}
+                  <div className="flex items-center gap-2 rounded-full border px-3 py-1">
+                    <span className={`inline-flex h-3 w-3 rounded-full ${PREVENTABLE_BG_CLASS}`} aria-hidden="true" />
+                    <span className="text-sm">Modifizierbar gesamt</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-full border px-3 py-1">
+                    <span className={`inline-flex h-3 w-3 rounded-full bg-current ${SELECTED_FACTOR_COLOR_CLASS}`} aria-hidden="true" />
+                    <span className="text-sm">Aktuelle Risikofaktoren</span>
+                  </div>
                 </div>
               </div>
 
               <div className="rounded-xl border p-3 text-sm text-muted-foreground">
-                <ul className="list-disc space-y-1 pl-5">
-                  <li>Rot = Prävalenz im gewählten Stratum.</li>
-                  <li>Grün = modifizierbarer Anteil ({fmtDE(PREVENTABLE_SHARE * 100)}% der Prävalenz).</li>
-                  <li>Die Stratum-spezifischen Faktorwerte werden intern proportional so skaliert, dass die Summe exakt {fmtDE(preventableCap)} ergibt.</li>
-                </ul>
+                {dementiaOn ? (
+                  <>
+                    Ihr Risiko lässt sich zu: <span className="font-medium tabular-nums">{fmtDE(reducedRisk)}%</span> reduzieren!
+                  </>
+                ) : (
+                  <>Demenz anklicken, um die Reduktion zu sehen.</>
+                )}
               </div>
             </CardContent>
           </Card>
