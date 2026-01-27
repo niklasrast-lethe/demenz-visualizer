@@ -564,7 +564,11 @@ export default function HundredPeopleVisualizer() {
 
   const sentenceStratum = (
     <span>
-      Wenn Sie <span className="font-semibold">{SEX_LABEL_SENTENCE[sex]}</span> ein Alter von <span className="font-semibold">{ageLabel} Jahren</span> erreichen, beträgt Ihr Demenzrisiko <span className={`font-semibold ${DEMENTIA_COLOR_CLASS}`}>{fmtDE(prevalence)} %</span>. Durch gezielte Intervention lässt sich Ihr Risiko um bis zu <span className={`font-semibold ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventableCap)} %</span> senken.
+      Wenn Sie <span className="font-semibold">{SEX_LABEL_SENTENCE[sex]}</span> ein Alter von{" "}
+      <span className="font-semibold">{ageLabel} Jahren</span> erreichen, beträgt Ihr Demenzrisiko{" "}
+      <span className={`font-semibold ${DEMENTIA_COLOR_CLASS}`}>{fmtDE(prevalence)} %</span>. Durch gezielte Interventionen lässt sich dieses Risiko zusätzlich um{" "}
+      <span className={`font-semibold ${SELECTED_FACTOR_COLOR_CLASS}`}>{fmtDE(preventedBlue)} %</span> reduzieren und insgesamt um bis zu{" "}
+      <span className={`font-semibold ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventableCap)} %</span> senken.
     </span>
   );
 
@@ -577,8 +581,22 @@ export default function HundredPeopleVisualizer() {
               <Users className="h-5 w-5" />
               <h1 className="text-xl font-semibold tracking-tight">Modifizierbares Demenzrisiko</h1>
             </div>
-            <p className="text-sm text-muted-foreground">Näherungswerte nach Livingston et al., The Lancet Commission on dementia prevention, intervention, and care (2024).</p>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <div>
+                Lebenszeitprävalenz basierend auf{" "}
+                <a
+                  href="https://www.alzheimer-europe.org/dementia/prevalence-dementia-europe?language_content_entity=en"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Alzheimer Europe
+                </a>
+              </div>
+              <div>Näherungswerte Risikofaktoren nach Livingston et al., The Lancet 2024.</div>
+            </div>
           </div>
+
           <Button variant="outline" onClick={reset} className="shrink-0">
             <RotateCcw className="mr-2 h-4 w-4" />
             Reset
@@ -700,15 +718,7 @@ export default function HundredPeopleVisualizer() {
                 </div>
               </div>
 
-              <div className="rounded-xl border p-3 text-sm text-muted-foreground">
-                <div>
-                  Ihr Risiko lässt sich zu: <span className={`font-medium tabular-nums ${SELECTED_FACTOR_COLOR_CLASS}`}>{fmtDE(preventedBlue)}%</span> reduzieren!
-                </div>
-                <div className="mt-1">
-                  Sie haben Ihr Demenzrisiko um <span className={`font-medium tabular-nums ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventedGreen)}</span> von 100 reduziert.
-                </div>
-              </div>
-            </CardContent>
+              </CardContent>
           </Card>
         </div>
       </div>
