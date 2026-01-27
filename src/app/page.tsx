@@ -356,7 +356,7 @@ function PersonIcon({
   const tooltip = !active
     ? "Nicht markiert"
     : overlayParts.length
-      ? `Demenz (Teil) – verhindert: ${[...new Set(overlayParts.map((p) => p.label))].join(", ")}`
+      ? `Demenz (Teil) – aktuelle Risikofaktoren: ${[...new Set(overlayParts.map((p) => p.label))].join(", ")}`
       : "Demenz";
 
   return (
@@ -489,8 +489,13 @@ export default function HundredPeopleVisualizer() {
 
   const stratumLabel = `${SEX_LABEL[sex]} ${AGE_GROUPS.find((a) => a.id === ageGroup)?.label ?? ageGroup}`;
 
-  const preventedShown = dementiaOn ? Math.min(preventableCap, Math.max(0, selectedSum)) : 0;
-  const reducedRisk = Math.max(0, prevalence - preventedShown);
+  // Blau selektiert = Summe der *angeklickten* Risikofaktoren (aktueller blauer Anteil)
+  const preventedBlue = dementiaOn ? Math.min(preventableCap, Math.max(0, selectedSum)) : 0;
+  // Grün (nicht ausgewählt) = Rest des modifizierbaren Anteils
+  const preventedGreen = dementiaOn ? Math.max(0, preventableCap - preventedBlue) : 0;
+
+  // Anzeige im Satz „Ihr Risiko lässt sich zu … reduzieren“: NUR der blaue Anteil (Summe der angeklickten Faktoren)
+  const blueReduction = preventedBlue;
 
   return (
     <div className="w-full p-4 md:p-8">
@@ -638,7 +643,7 @@ export default function HundredPeopleVisualizer() {
                   Demenz: <span className="font-medium tabular-nums">{dementiaOn ? fmtDE(baselineEnd) : "0,0"}</span> / 100
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  Verhindert: <span className="font-medium tabular-nums">{dementiaOn ? fmtDE(preventedShown) : "0,0"}</span> /
+                  Verhindert: <span className="font-medium tabular-nums">{dementiaOn ? fmtDE(preventedGreen) : "0,0"}</span> /
                   <span className={`font-medium tabular-nums ${PREVENTABLE_COLOR_CLASS}`}> {fmtDE(preventableCap)}</span>
                 </div>
               </div>
@@ -680,7 +685,12 @@ export default function HundredPeopleVisualizer() {
               <div className="rounded-xl border p-3 text-sm text-muted-foreground">
                 {dementiaOn ? (
                   <>
-                    Ihr Risiko lässt sich zu: <span className="font-medium tabular-nums">{fmtDE(reducedRisk)}%</span> reduzieren!
+                    <div>
+                      Ihr Risiko lässt sich zu: <span className="font-medium tabular-nums">{fmtDE(blueReduction)}%</span> reduzieren!
+                    </div>
+                    <div className="mt-1">
+                      Sie haben ihr Demenzrisiko um <span className={`font-medium tabular-nums ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventedGreen)}</span> von 100 reduziert (entspricht dem grünen Anteil).
+                    </div>
                   </>
                 ) : (
                   <>Demenz anklicken, um die Reduktion zu sehen.</>
