@@ -506,9 +506,9 @@ export default function HundredPeopleVisualizer() {
           </Alert>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           {/* LEFT */}
-          <Card className="rounded-2xl">
+          <Card className="rounded-2xl md:col-span-1">
             <CardContent className="space-y-4 pt-6">
               {/* Sex + Age */}
               <div className="rounded-xl border p-3 space-y-3">
@@ -585,7 +585,7 @@ export default function HundredPeopleVisualizer() {
           </Card>
 
           {/* RIGHT */}
-          <Card className="rounded-2xl">
+          <Card className="rounded-2xl md:col-span-2">
             <CardContent className="space-y-4 pt-6">
               <div className="rounded-xl border p-3">
                 <div className="text-sm text-muted-foreground">{sentenceStratum}</div>
