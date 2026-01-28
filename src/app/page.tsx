@@ -520,9 +520,9 @@ export default function HundredPeopleVisualizer() {
   };
 
   const setStratum = (nextSex: Sex, nextAge: AgeGroup) => {
+    // Kein automatischer Reset der Risikofaktoren beim Wechsel von Geschlecht/Alter.
     setSex(nextSex);
     setAgeGroup(nextAge);
-    setSelectedIds(new Set());
   };
 
   const toggleRiskFactor = (id: string, on: boolean) => {
@@ -566,9 +566,11 @@ export default function HundredPeopleVisualizer() {
     <span>
       Wenn Sie <span className="font-semibold">{SEX_LABEL_SENTENCE[sex]}</span> ein Alter von{" "}
       <span className="font-semibold">{ageLabel} Jahren</span> erreichen, beträgt Ihr Demenzrisiko{" "}
-      <span className={`font-semibold ${DEMENTIA_COLOR_CLASS}`}>{fmtDE(prevalence)} %</span>. Durch gezielte Interventionen lässt sich dieses Risiko zusätzlich um{" "}
-      <span className={`font-semibold ${SELECTED_FACTOR_COLOR_CLASS}`}>{fmtDE(preventedBlue)} %</span> reduzieren und insgesamt um bis zu{" "}
-      <span className={`font-semibold ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventableCap)} %</span> senken.
+      <span className={`font-semibold ${DEMENTIA_COLOR_CLASS}`}>{fmtDE(prevalence)} %</span>.
+      <br />
+      Durch gezielte Interventionen können Sie jetzt den beeinflussbaren Anteil Ihres Risikos um bis zu{" "}
+      <span className={`font-semibold ${SELECTED_FACTOR_COLOR_CLASS}`}>{fmtDE(preventedBlue)} %</span> reduzieren und damit Ihr gesamtes Präventionspotenzial von{" "}
+      <span className={`font-semibold ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventableCap)} %</span> erreichen.
     </span>
   );
 
