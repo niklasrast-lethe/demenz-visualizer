@@ -564,13 +564,15 @@ export default function HundredPeopleVisualizer() {
 
   const sentenceStratum = (
     <span>
-      Wenn Sie <span className="font-semibold">{SEX_LABEL_SENTENCE[sex]}</span> ein Alter von{" "}
-      <span className="font-semibold">{ageLabel} Jahren</span> erreichen, beträgt Ihr Demenzrisiko{" "}
+      Wenn Sie als <span className="font-semibold">{sex === "w" ? "Frau" : "Mann"}</span> ein Alter von{" "}
+      <span className="font-semibold">{ageLabel} Jahren</span> erreichen, beträgt Ihr statistisches Demenzrisiko{" "}
       <span className={`font-semibold ${DEMENTIA_COLOR_CLASS}`}>{fmtDE(prevalence)} %</span>.
       <br />
-      Durch gezielte Interventionen können Sie jetzt den beeinflussbaren Anteil Ihres Risikos um bis zu{" "}
-      <span className={`font-semibold ${SELECTED_FACTOR_COLOR_CLASS}`}>{fmtDE(preventedBlue)} %</span> reduzieren und damit Ihr gesamtes Präventionspotenzial von{" "}
-      <span className={`font-semibold ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventableCap)} %</span> erreichen.
+      Durch gezielte Intervention können Sie <span className="font-semibold">jetzt</span> den beeinflussbaren Anteil Ihres Risikos um bis zu{" "}
+      <span className={`font-semibold ${SELECTED_FACTOR_COLOR_CLASS}`}>{fmtDE(preventedBlue)} %</span> reduzieren.
+      <br />
+      Insgesamt erreichen Sie so Ihr gesamtes Präventionspotenzial von{" "}
+      <span className={`font-semibold ${PREVENTABLE_COLOR_CLASS}`}>{fmtDE(preventableCap)} %</span>.
     </span>
   );
 
@@ -711,11 +713,11 @@ export default function HundredPeopleVisualizer() {
                   </div>
                   <div className="flex items-center gap-2 rounded-full border px-3 py-1">
                     <span className={`inline-flex h-3 w-3 rounded-full ${PREVENTABLE_BG_CLASS}`} aria-hidden="true" />
-                    <span className="text-sm">Modifizierbar gesamt</span>
+                    <span className="text-sm">Erreichtes Präventionspotenzial</span>
                   </div>
                   <div className="flex items-center gap-2 rounded-full border px-3 py-1">
                     <span className={`inline-flex h-3 w-3 rounded-full ${SELECTED_FACTOR_BG_CLASS}`} aria-hidden="true" />
-                    <span className="text-sm">Aktuelle Risikofaktoren</span>
+                    <span className="text-sm">Modifizierbares Präventionspotenzial</span>
                   </div>
                 </div>
               </div>
